@@ -70,4 +70,5 @@ Received dot event: {'event_type': 'dot_appeared', 'position': [0, 2], 'timestam
 Received dot event: {'event_type': 'dot_appeared', 'position': [0, 4], 'timestamp': '2025-12-17T22:08:44.633890'}
 Received dot event: {'event_type': 'dot_appeared', 'position': [4, 2], 'timestamp': '2025-12-17T22:08:46.386167'}
 Received dot event: {'event_type': 'dot_appeared', 'position': [3, 4], 'timestamp': '2025-12-17T22:08:47.225544'}
-Received dot event: {'event_type': 'dot_appeared', 'position': [1, 1], 'timestamp': '2025-12-17T22:08:48.364526'}
+Received dot event: {'event_type': 'dot_appeared', 'position': [1, 1], 'timestamp': '2025-12-17T22:08:48.364526'}/opt/homebrew/Caskroom/miniconda/base/lib/python3.13/multiprocessing/resource_tracker.py:301: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-t5uv3g9w'}
+  warnings.warn(
