@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask
 from flask_socketio import SocketIO, emit
 from kafka import KafkaConsumer, KafkaProducer
 import json
@@ -20,7 +20,9 @@ actions_producer = None
 game_state = {
     'score': 0,
     'misses': 0,
-    'game_over': False
+    'game_over': False,
+    'target_score': 10,  # Win condition: reach 10 points
+    'max_misses': 5      # Lose condition: 5 misses
 }
 
 def consume_dots():
@@ -41,7 +43,7 @@ def consume_dots():
 
 def consume_actions():
     """Consume user action events from Kafka and update game state"""
-    global actions_consumer
+    global actions_consumer, game_state
     
     actions_consumer = KafkaConsumer(
         'actions',
@@ -58,7 +60,30 @@ def consume_actions():
         elif event['event_type'] == 'dot_missed':
             game_state['misses'] += 1
             
+        # Check win/lose conditions
+        check_game_status()
+        
         # Send updated game state to clients
+        socketio.emit('game_state_update', game_state)
+
+def check_game_status():
+    """Check if the game should end based on win/lose conditions"""
+    global game_state
+    
+    # Win condition: reach target score
+    if game_state['score'] >= game_state['target_score']:
+        game_state['game_over'] = True
+        game_state['win'] = True
+        socketio.emit('game_over', {'result': 'win', 'message': f'Congratulations! You won with {game_state["score"]} points!'})
+    
+    # Lose condition: too many misses
+    elif game_state['misses'] >= game_state['max_misses']:
+        game_state['game_over'] = True
+        game_state['win'] = False
+        socketio.emit('game_over', {'result': 'lose', 'message': f'Game Over! You missed too many dots. Score: {game_state["score"]}'})
+    
+    # If game is over, send final state
+    if game_state['game_over']:
         socketio.emit('game_state_update', game_state)
 
 @app.route('/')
@@ -83,12 +108,27 @@ def handle_catch_dot(data):
     # Send action to Kafka
     if actions_producer:
         event = {
-            "event_type": "dot_caught",
+            "event_type": data['event_type'],
             "position": data['position'],
             "timestamp": data['timestamp']
         }
         actions_producer.send('actions', value=event)
         actions_producer.flush()
+
+@socketio.on('reset_game')
+def handle_reset_game():
+    """Reset the game to initial state"""
+    global game_state
+    game_state = {
+        'score': 0,
+        'misses': 0,
+        'game_over': False,
+        'target_score': 10,
+        'max_misses': 5
+    }
+    # Notify all clients that game has been reset
+    socketio.emit('game_reset', game_state)
+    socketio.emit('game_state_update', game_state)
 
 if __name__ == '__main__':
     # Initialize Kafka producer

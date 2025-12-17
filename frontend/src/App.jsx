@@ -8,6 +8,9 @@ function App() {
   const [score, setScore] = useState(0);
   const [misses, setMisses] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+  const [gameResult, setGameResult] = useState(null);
+  const [targetScore] = useState(10);
+  const [maxMisses] = useState(5);
   const socketRef = useRef(null);
 
   // Initialize grid and WebSocket connection
@@ -26,14 +29,16 @@ function App() {
       const [x, y] = position;
       
       // Show the dot
-      const newGrid = [...grid];
-      newGrid[x][y] = true;
-      setGrid(newGrid);
+      setGrid(prevGrid => {
+        const newGrid = prevGrid.map(row => [...row]);
+        newGrid[x][y] = true;
+        return newGrid;
+      });
       
       // Set a timeout to hide the dot if not clicked
       setTimeout(() => {
         setGrid(prevGrid => {
-          const updatedGrid = [...prevGrid];
+          const updatedGrid = prevGrid.map(row => [...row]);
           if (updatedGrid[x][y]) {
             updatedGrid[x][y] = false;
             // Notify server that dot was missed
@@ -42,9 +47,8 @@ function App() {
               timestamp: new Date().toISOString(),
               event_type: 'dot_missed'
             });
-            return updatedGrid;
           }
-          return prevGrid;
+          return updatedGrid;
         });
       }, 2000); // Dot disappears after 2 seconds if not caught
     });
@@ -55,6 +59,22 @@ function App() {
       setScore(data.score || 0);
       setMisses(data.misses || 0);
       setGameOver(data.game_over || false);
+    });
+    
+    // Listen for game over event
+    socketRef.current.on('game_over', (data) => {
+      console.log('Game over:', data);
+      setGameResult(data);
+      setGameOver(true);
+    });
+    
+    // Listen for game reset event
+    socketRef.current.on('game_reset', (data) => {
+      console.log('Game reset:', data);
+      setGameOver(false);
+      setGameResult(null);
+      const newGrid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false));
+      setGrid(newGrid);
     });
     
     // Clean up WebSocket connection
@@ -71,9 +91,11 @@ function App() {
     
     if (grid[x][y]) {
       // Caught the dot
-      const newGrid = [...grid];
-      newGrid[x][y] = false;
-      setGrid(newGrid);
+      setGrid(prevGrid => {
+        const newGrid = prevGrid.map(row => [...row]);
+        newGrid[x][y] = false;
+        return newGrid;
+      });
       
       // Notify server that dot was caught
       socketRef.current.emit('catch_dot', {
@@ -86,11 +108,7 @@ function App() {
 
   // Reset game
   const resetGame = () => {
-    const newGrid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false));
-    setGrid(newGrid);
-    setScore(0);
-    setMisses(0);
-    setGameOver(false);
+    socketRef.current.emit('reset_game');
   };
 
   return (
@@ -98,8 +116,29 @@ function App() {
       <header className="App-header">
         <h1>Dot Catcher Game</h1>
         <div className="game-stats">
-          <div>Score: {score}</div>
-          <div>Misses: {misses}</div>
+          <div>Score: {score}/{targetScore}</div>
+          <div>Misses: {misses}/{maxMisses}</div>
+        </div>
+        
+        <div className="progress-bars">
+          <div className="progress-container">
+            <label>Progress:</label>
+            <div className="progress-bar">
+              <div 
+                className="progress-fill" 
+                style={{width: `${Math.min(100, (score/targetScore)*100)}%`}}
+              ></div>
+            </div>
+          </div>
+          <div className="progress-container">
+            <label>Mistakes:</label>
+            <div className="progress-bar mistake-bar">
+              <div 
+                className="progress-fill" 
+                style={{width: `${Math.min(100, (misses/maxMisses)*100)}%`}}
+              ></div>
+            </div>
+          </div>
         </div>
         
         <div className="grid-container">
@@ -124,8 +163,9 @@ function App() {
         
         {gameOver && (
           <div className="game-over">
-            <h2>Game Over!</h2>
-            <p>Final Score: {score}</p>
+            <h2>{gameResult?.result === 'win' ? '🎉 You Won! 🎉' : '😢 Game Over 😢'}</h2>
+            <p>{gameResult?.message}</p>
+            <button onClick={resetGame}>Play Again</button>
           </div>
         )}
       </header>
