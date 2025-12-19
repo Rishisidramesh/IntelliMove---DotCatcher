@@ -1,0 +1,1 @@
+Dot Catcher is a fun interactive game/application where users try to catch moving dots on the screen. The application tracks user interactions, scores, and other statistics to enhance the gaming experience.
